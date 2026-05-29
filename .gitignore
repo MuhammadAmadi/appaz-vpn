@@ -1,0 +1,9 @@
+# Никогда не коммитим
+*.key
+*.pem
+*.crt
+secrets/
+.env
+cf-token.txt
+x-ui.db
+config.json

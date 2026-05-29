@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>appaz · cloud gaming, reimagined</title>
+  <meta name="description" content="appaz is a cloud gaming platform with AI-augmented frame synthesis and adaptive co-pilots. Access by invitation.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0b0c'/%3E%3Cpath d='M18 44 L32 18 L46 44 M23 36 H41' stroke='%23d4a574' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b0b0c;
+      --bg-elevated: #141416;
+      --bg-card: #111113;
+      --border: #1e1e22;
+      --border-strong: #2a2a30;
+      --text: #ededed;
+      --text-muted: #8a8a90;
+      --text-dim: #5a5a60;
+      --accent: #d4a574;
+      --accent-dim: #8a6f4d;
+      --accent-glow: rgba(212, 165, 116, 0.08);
+      --danger: #e87d5a;
+      --success: #7da97d;
+
+      --font-display: 'Instrument Serif', 'Times New Roman', serif;
+      --font-sans: 'Geist', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+      --container: 1200px;
+      --pad: clamp(1.25rem, 4vw, 2.5rem);
+      --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: -10%;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 0%, rgba(212, 165, 116, 0.07), transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 100%, rgba(212, 165, 116, 0.05), transparent 60%),
+        radial-gradient(ellipse 40% 30% at 60% 40%, rgba(212, 165, 116, 0.03), transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      animation: bgDrift 32s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgDrift {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(-3%, 2%, 0) scale(1.05); }
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0, transparent 79px, rgba(255,255,255,0.012) 79px, rgba(255,255,255,0.012) 80px),
+        repeating-linear-gradient(90deg, transparent 0, transparent 79px, rgba(255,255,255,0.012) 79px, rgba(255,255,255,0.012) 80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main, nav, footer { position: relative; z-index: 1; }
+
+    .container {
+      max-width: var(--container);
+      margin: 0 auto;
+      padding-left: var(--pad);
+      padding-right: var(--pad);
+    }
+
+    .lang-ru { display: none; }
+    [data-lang="ru"] .lang-en { display: none; }
+    [data-lang="ru"] .lang-ru { display: inline; }
+    [data-lang="ru"] .lang-ru.block { display: block; }
+    .lang-ru.block { display: none; }
+    [data-lang="ru"] .lang-en.block { display: none; }
+    .lang-en.block { display: block; }
+
+    nav.top {
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(11, 11, 12, 0.7);
+      border-bottom: 1px solid var(--border);
+      z-index: 50;
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 1.1rem;
+      padding-bottom: 1.1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-mark {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-suffix {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .lang-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+    }
+
+    .lang-toggle button {
+      background: none;
+      border: 0;
+      color: var(--text-muted);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      font-size: inherit;
+    }
+
+    [data-lang="en"] .lang-toggle button[data-lang-set="en"],
+    [data-lang="ru"] .lang-toggle button[data-lang-set="ru"] {
+      background: var(--text);
+      color: var(--bg);
+    }
+
+    .btn-login {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 0.85rem;
+      padding: 0.5rem 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: -0.005em;
+    }
+
+    .btn-login:hover {
+      border-color: var(--accent-dim);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .hero {
+      padding-top: clamp(4rem, 12vw, 8rem);
+      padding-bottom: clamp(4rem, 10vw, 7rem);
+      position: relative;
+    }
+
+    h1.headline {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: clamp(2.5rem, 7vw, 5.5rem);
+      line-height: 1.02;
+      letter-spacing: -0.035em;
+      max-width: 18ch;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.9s var(--ease-out-quint) 0.15s both;
+    }
+
+    h1.headline em {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      display: inline-block;
+      animation: emphasisIn 1.2s var(--ease-out-quint) 0.5s both;
+    }
+
+    @keyframes emphasisIn {
+      0% { opacity: 0; transform: translateY(8px) rotate(-1deg); filter: blur(4px); }
+      100% { opacity: 1; transform: translateY(0) rotate(0); filter: blur(0); }
+    }
+
+    .sub {
+      font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 52ch;
+      margin-bottom: 2.75rem;
+      line-height: 1.55;
+      animation: fadeUp 0.9s var(--ease-out-quint) 0.35s both;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+      margin-bottom: 4.5rem;
+      animation: fadeUp 0.9s var(--ease-out-quint) 0.5s both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.85rem 1.5rem;
+      border-radius: 6px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      letter-spacing: -0.01em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px -8px rgba(212, 165, 116, 0.4);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--text-muted);
+      background: var(--bg-card);
+    }
+
+    .btn .arrow {
+      display: inline-block;
+      transition: transform 0.25s var(--ease-out-quint);
+    }
+
+    .btn:hover .arrow { transform: translateX(4px); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1.5rem 3rem;
+      padding: 2rem 0;
+      border-top: 1px solid var(--border);
+      animation: fadeUp 0.9s var(--ease-out-quint) 0.65s both;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      cursor: default;
+      transition: transform 0.3s var(--ease-out-quint);
+    }
+
+    .metric:hover { transform: translateY(-3px); }
+
+    .metric-value {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      letter-spacing: -0.02em;
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1;
+      transition: color 0.3s ease;
+    }
+
+    .metric:hover .metric-value { color: var(--accent); }
+
+    .metric-value sup {
+      font-family: var(--font-mono);
+      font-size: 0.55em;
+      color: var(--accent);
+      margin-left: 0.15em;
+      vertical-align: super;
+    }
+
+    .metric-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 36px;
+      background: var(--border-strong);
+      border-radius: 1px;
+      overflow: hidden;
+      animation: fadeIn 1s ease-out 1.5s both;
+    }
+
+    .scroll-hint::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      animation: scrollDot 2.2s ease-in-out infinite;
+    }
+
+    @keyframes scrollDot {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
+    .section {
+      padding-top: clamp(5rem, 10vw, 8rem);
+      padding-bottom: clamp(5rem, 10vw, 8rem);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 4rem;
+      flex-wrap: wrap;
+    }
+
+    .section-num {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+    }
+
+    h2.section-title {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+      max-width: 22ch;
+    }
+
+    h2.section-title em {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .feature {
+      background: var(--bg-card);
+      padding: 2rem 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 240px;
+      transition: background 0.35s ease, transform 0.6s var(--ease-out-quint), opacity 0.6s ease;
+      position: relative;
+      opacity: 0;
+      transform: translateY(24px);
+    }
+
+    .feature.in { opacity: 1; transform: translateY(0); }
+
+    .feature:hover {
+      background: var(--bg-elevated);
+    }
+
+    .feature::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-left: 2px solid transparent;
+      transition: border-color 0.3s ease;
+    }
+
+    .feature:hover::after { border-left-color: var(--accent); }
+
+    .feature-icon {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+
+    .feature h3 {
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 1.25rem;
+      letter-spacing: -0.015em;
+      line-height: 1.25;
+    }
+
+    .feature p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-top: auto;
+    }
+
+    .manifesto {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .manifesto-label {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      margin-bottom: 2rem;
+    }
+
+    .manifesto-lead {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: clamp(1.5rem, 2.8vw, 2.1rem);
+      line-height: 1.35;
+      letter-spacing: -0.015em;
+      color: var(--text);
+      margin-bottom: 2rem;
+    }
+
+    .manifesto p {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      line-height: 1.75;
+      margin-bottom: 1.25rem;
+    }
+
+    .manifesto p strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .access-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      padding: 0.5rem 0.9rem;
+      border: 1px solid var(--accent-dim);
+      background: var(--accent-glow);
+      border-radius: 4px;
+      margin-bottom: 2rem;
+    }
+
+    .access-tag::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    .access-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 4rem;
+      align-items: start;
+    }
+
+    @media (max-width: 800px) {
+      .access-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+    }
+
+    .access-form {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      transition: border-color 0.3s ease;
+    }
+
+    .access-form:focus-within { border-color: var(--border-strong); }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .form-row label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+    }
+
+    .form-row input,
+    .form-row textarea {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 0.9rem;
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .form-row input:focus,
+    .form-row textarea:focus {
+      outline: none;
+      border-color: var(--accent-dim);
+      background: var(--bg-elevated);
+    }
+
+    .form-row textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+
+    .form-note {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+      margin-top: 1rem;
+    }
+
+    .form-success {
+      background: rgba(125, 169, 125, 0.08);
+      border: 1px solid rgba(125, 169, 125, 0.25);
+      color: var(--success);
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      display: none;
+      animation: fadeUp 0.4s ease-out;
+    }
+
+    .form-success.show { display: block; }
+
+    .form-error {
+      background: rgba(232, 125, 90, 0.08);
+      border: 1px solid rgba(232, 125, 90, 0.25);
+      color: var(--danger);
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      display: none;
+      animation: fadeUp 0.4s ease-out;
+    }
+
+    .form-error.show { display: block; }
+
+    .access-side h2 {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+
+    .access-side h2 em {
+      font-family: var(--font-display);
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .access-side p {
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 1rem;
+    }
+
+    .email-line {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .email-line a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--accent-dim);
+      transition: all 0.2s ease;
+    }
+
+    .email-line a:hover { color: var(--text); border-color: var(--text); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 3rem;
+      padding-bottom: 2.5rem;
+      margin-top: 4rem;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .footer-brand {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.3rem;
+      letter-spacing: -0.02em;
+    }
+
+    .footer-meta {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.75rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover { color: var(--accent); }
+
+    .footer-fineprint {
+      width: 100%;
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      line-height: 1.6;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .modal {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      padding: 2rem;
+      position: relative;
+      transform: translateY(20px) scale(0.96);
+      transition: transform 0.35s var(--ease-out-quint);
+    }
+
+    .modal-backdrop.open .modal { transform: translateY(0) scale(1); }
+
+    .modal-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: transparent;
+      border: 0;
+      color: var(--text-muted);
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+
+    .modal h3 {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .modal h3 em {
+      font-family: var(--font-display);
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .modal-sub {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-error {
+      background: rgba(232, 125, 90, 0.08);
+      border: 1px solid rgba(232, 125, 90, 0.25);
+      color: var(--danger);
+      padding: 0.75rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-top: 1rem;
+      display: none;
+      animation: shake 0.4s ease-out;
+    }
+
+    .modal-error.show { display: block; }
+
+    .modal-error a {
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s var(--ease-out-quint), transform 0.8s var(--ease-out-quint);
+    }
+
+    .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    ::selection {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    @media (max-width: 600px) {
+      .nav-right { gap: 0.5rem; }
+      .btn-login { padding: 0.45rem 0.85rem; font-size: 0.8rem; }
+      .section-head { margin-bottom: 2.5rem; }
+      .cta-row .btn { flex: 1; justify-content: center; }
+      .scroll-hint { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container nav-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark">appaz</span>
+      <span class="brand-suffix">/ labs</span>
+    </a>
+    <div class="nav-right">
+      <button class="btn-login" id="openLogin" type="button">
+        <span class="lang-en">Login</span><span class="lang-ru">Войти</span>
+      </button>
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button data-lang-set="en" type="button">EN</button>
+        <button data-lang-set="ru" type="button">RU</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+  <section class="hero">
+    <div class="container">
+      <h1 class="headline">
+        <span class="lang-en">Cloud gaming, <em>reimagined</em> with machine intuition.</span>
+        <span class="lang-ru">Облачный гейминг, <em>переосмысленный</em> машинной интуицией.</span>
+      </h1>
+
+      <p class="sub">
+        <span class="lang-en">appaz is a research-grade streaming platform with AI-augmented frame synthesis and adaptive in-game co-pilots. We're shipping it to a small cohort of players, designers, and engineers before we open the doors.</span>
+        <span class="lang-ru">appaz — это исследовательская платформа стриминга с генеративным синтезом кадров и адаптивными игровыми ко-пилотами на базе ИИ. Мы выкатываем её небольшой группе игроков, дизайнеров и инженеров, прежде чем открыть доступ всем.</span>
+      </p>
+
+      <div class="cta-row">
+        <a href="#access" class="btn btn-primary">
+          <span class="lang-en">Request access</span><span class="lang-ru">Запросить доступ</span>
+          <span class="arrow">→</span>
+        </a>
+        <a href="#manifesto" class="btn btn-ghost">
+          <span class="lang-en">Read manifesto</span><span class="lang-ru">Манифест</span>
+        </a>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value">47<sup>ms</sup></div>
+          <div class="metric-label">
+            <span class="lang-en">p50 input latency</span><span class="lang-ru">задержка p50</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">1080<sup>p60</sup></div>
+          <div class="metric-label">
+            <span class="lang-en">streaming target</span><span class="lang-ru">целевой стрим</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">12</div>
+          <div class="metric-label">
+            <span class="lang-en">edge regions</span><span class="lang-ru">edge-регионов</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">∞</div>
+          <div class="metric-label">
+            <span class="lang-en">install required</span><span class="lang-ru">установок не нужно</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-hint" aria-hidden="true"></div>
+  </section>
+
+  <section class="section" id="capabilities">
+    <div class="container">
+      <div class="section-head reveal">
+        <div>
+          <div class="section-num">[ 01 / capabilities ]</div>
+          <h2 class="section-title">
+            <span class="lang-en">Three things we built <em>differently</em>.</span>
+            <span class="lang-ru">Три вещи, которые мы делаем <em>иначе</em>.</span>
+          </h2>
+        </div>
+      </div>
+
+      <div class="features">
+        <article class="feature">
+          <div class="feature-icon">01</div>
+          <h3>
+            <span class="lang-en">Generative frame synthesis</span>
+            <span class="lang-ru">Генеративный синтез кадров</span>
+          </h3>
+          <p>
+            <span class="lang-en">A lightweight diffusion model reconstructs intermediate frames on the edge, holding sub-30ms perceived latency even on lossy mobile networks.</span>
+            <span class="lang-ru">Лёгкая диффузионная модель достраивает промежуточные кадры прямо на edge-узле, удерживая воспринимаемую задержку ниже 30 мс даже на нестабильном мобильном интернете.</span>
+          </p>
+        </article>
+
+        <article class="feature">
+          <div class="feature-icon">02</div>
+          <h3>
+            <span class="lang-en">Browser-native delivery</span>
+            <span class="lang-ru">Доставка через браузер</span>
+          </h3>
+          <p>
+            <span class="lang-en">Built on WebRTC and WebCodecs. No launcher, no driver, no install. Open a tab, play. Works on locked-down laptops and school networks.</span>
+            <span class="lang-ru">Поверх WebRTC и WebCodecs. Без лаунчера, без драйверов, без установки. Открыл вкладку — играешь. Работает даже на закрытых корпоративных и учебных машинах.</span>
+          </p>
+        </article>
+
+        <article class="feature">
+          <div class="feature-icon">03</div>
+          <h3>
+            <span class="lang-en">Adaptive co-pilot</span>
+            <span class="lang-ru">Адаптивный ко-пилот</span>
+          </h3>
+          <p>
+            <span class="lang-en">An in-session LLM learns your style and offers route suggestions, build orders, or hint overlays — opt-in per title, off by default in PvP.</span>
+            <span class="lang-ru">LLM прямо в сессии учится твоему стилю и подсказывает маршруты, билд-ордеры или подсветку — включается по запросу для каждой игры, в PvP отключён по умолчанию.</span>
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="manifesto">
+    <div class="container">
+      <div class="manifesto reveal">
+        <div class="manifesto-label">[ 02 / manifesto ]</div>
+
+        <p class="manifesto-lead">
+          <span class="lang-en">We're not chasing a launch date. We're chasing a feeling — that the latency is gone, that the machine is somewhere in the room with you.</span>
+          <span class="lang-ru">Мы не гонимся за датой релиза. Мы гонимся за ощущением — что задержки больше нет, что машина оказалась где-то рядом с тобой в комнате.</span>
+        </p>
+
+        <p>
+          <span class="lang-en"><strong>Closed beta is a discipline, not a marketing tactic.</strong> Every new player costs us hardware, time, and the patience of the people already in. So we onboard slowly and we ask each invitee to actually play — to break the model, file thoughtful reports, and stay engaged.</span>
+          <span class="lang-ru"><strong>Закрытая бета — это дисциплина, а не маркетинг.</strong> Каждый новый игрок стоит нам железа, времени и терпения тех, кто уже внутри. Поэтому мы добавляем людей медленно и просим каждого приглашённого реально играть — ломать модель, писать осмысленные отчёты и оставаться с нами.</span>
+        </p>
+
+        <p>
+          <span class="lang-en">If you're here because someone forwarded you the link — they were probably right to. We don't run ads. We don't have a referral program. The application form below is the only door.</span>
+          <span class="lang-ru">Если ты сюда попал, потому что кто-то скинул ссылку — он, скорее всего, был прав. Мы не запускаем рекламу. У нас нет реферальной программы. Форма заявки ниже — единственная дверь.</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="access">
+    <div class="container">
+      <div class="section-head reveal">
+        <div>
+          <div class="section-num">[ 03 / access ]</div>
+        </div>
+      </div>
+
+      <div class="access-grid reveal">
+        <div class="access-side">
+          <span class="access-tag">
+            <span class="lang-en">Closed beta · by invitation</span><span class="lang-ru">Закрытая бета · по приглашению</span>
+          </span>
+          <h2>
+            <span class="lang-en">Apply for <em>access</em>.</span>
+            <span class="lang-ru">Подать <em>заявку</em>.</span>
+          </h2>
+          <p>
+            <span class="lang-en">Applications are read by humans. We respond to every applicant, accepted or not.</span>
+            <span class="lang-ru">Заявки читают живые люди. Мы отвечаем каждому — и принятым, и нет.</span>
+          </p>
+          <p>
+            <span class="lang-en">Tell us what you'd play, and why you're worth one of the slots. Long answers welcome.</span>
+            <span class="lang-ru">Расскажи, во что бы ты играл и почему тебе стоит дать слот. Длинные ответы приветствуются.</span>
+          </p>
+          <div class="email-line">
+            <span class="lang-en">Or reach us at</span><span class="lang-ru">Или напиши на</span>
+            <a href="mailto:support@appaz.xyz">support@appaz.xyz</a>
+          </div>
+        </div>
+
+        <form class="access-form" id="accessForm" action="https://api.appaz.xyz/access" method="POST" novalidate>
+          <div class="form-row">
+            <label for="f-name">
+              <span class="lang-en">Your name</span><span class="lang-ru">Имя</span>
+            </label>
+            <input type="text" id="f-name" name="name" autocomplete="name" required>
+          </div>
+          <div class="form-row">
+            <label for="f-email">
+              <span class="lang-en">Email</span><span class="lang-ru">Электронная почта</span>
+            </label>
+            <input type="email" id="f-email" name="email" autocomplete="email" required>
+          </div>
+          <div class="form-row">
+            <label for="f-why">
+              <span class="lang-en">Why you</span><span class="lang-ru">Почему именно ты</span>
+            </label>
+            <textarea id="f-why" name="why" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; justify-content: center;">
+            <span class="btn-label">
+              <span class="lang-en">Submit application</span><span class="lang-ru">Отправить заявку</span>
+            </span>
+            <span class="arrow">→</span>
+          </button>
+          <div class="form-note">
+            <span class="lang-en">By submitting you agree to receive a single response email. We don't add you to any list.</span>
+            <span class="lang-ru">Отправляя форму, ты соглашаешься получить одно ответное письмо. В рассылки мы не добавляем.</span>
+          </div>
+          <div class="form-success" id="formSuccess">
+            <span class="lang-en">Thanks — your application is in the queue. We'll be in touch.</span>
+            <span class="lang-ru">Спасибо — заявка ушла в очередь. Мы свяжемся.</span>
+          </div>
+          <div class="form-error" id="formError">
+            <span class="lang-en">Couldn't submit right now. Please email us at <a href="mailto:support@appaz.xyz" style="color: inherit; text-decoration: underline;">support@appaz.xyz</a></span>
+            <span class="lang-ru">Не удалось отправить. Напиши нам на <a href="mailto:support@appaz.xyz" style="color: inherit; text-decoration: underline;">support@appaz.xyz</a></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-backdrop" id="loginModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <button class="modal-close" id="closeLogin" type="button" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3 L13 13 M13 3 L3 13"/></svg>
+    </button>
+    <h3 id="loginTitle">
+      <span class="lang-en">Welcome <em>back</em></span><span class="lang-ru">С <em>возвращением</em></span>
+    </h3>
+    <p class="modal-sub">
+      <span class="lang-en">Sign in with your beta credentials.</span><span class="lang-ru">Войди с учётной записью из беты.</span>
+    </p>
+    <form id="loginForm" novalidate>
+      <div class="form-row">
+        <label for="l-email"><span class="lang-en">Email</span><span class="lang-ru">Электронная почта</span></label>
+        <input type="email" id="l-email" required autocomplete="email">
+      </div>
+      <div class="form-row">
+        <label for="l-pass"><span class="lang-en">Password</span><span class="lang-ru">Пароль</span></label>
+        <input type="password" id="l-pass" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginSubmit" style="width: 100%; justify-content: center;">
+        <span class="lang-en">Sign in</span><span class="lang-ru">Войти</span>
+        <span class="arrow">→</span>
+      </button>
+      <div class="modal-error" id="loginError">
+        <span class="lang-en">Invalid email or password. New here? <a class="errorToAccess">Apply for access</a>.</span>
+        <span class="lang-ru">Неверный email или пароль. Впервые здесь? <a class="errorToAccess">Подай заявку</a>.</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <div class="footer-brand">appaz / labs</div>
+        <div class="footer-meta">
+          <span class="lang-en">Streaming research · est. 2025</span>
+          <span class="lang-ru">Streaming research · с 2025</span>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#capabilities">
+          <span class="lang-en">Capabilities</span><span class="lang-ru">Возможности</span>
+        </a>
+        <a href="#manifesto">
+          <span class="lang-en">Manifesto</span><span class="lang-ru">Манифест</span>
+        </a>
+        <a href="#access">
+          <span class="lang-en">Access</span><span class="lang-ru">Доступ</span>
+        </a>
+        <a href="mailto:support@appaz.xyz">
+          <span class="lang-en">Contact</span><span class="lang-ru">Контакты</span>
+        </a>
+      </div>
+    </div>
+    <div class="footer-fineprint">
+      <span class="lang-en">© 2026 appaz labs. All telemetry is anonymized and used only for engineering. This page does not set tracking cookies. Operated as a research project; no commercial agreement is implied by your visit.</span>
+      <span class="lang-ru">© 2026 appaz labs. Вся телеметрия обезличена и используется только в инженерных целях. Эта страница не ставит трекинговые куки. Сайт работает как исследовательский проект; ваше посещение не создаёт коммерческих обязательств.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    const root = document.documentElement;
+
+    const stored = localStorage.getItem('appaz_lang');
+    if (stored === 'ru' || stored === 'en') {
+      root.dataset.lang = stored;
+      root.lang = stored;
+    } else {
+      const browserLang = (navigator.language || 'en').toLowerCase();
+      if (browserLang.startsWith('ru')) {
+        root.dataset.lang = 'ru';
+        root.lang = 'ru';
+      }
+    }
+
+    document.querySelectorAll('.lang-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lang = btn.dataset.langSet;
+        root.dataset.lang = lang;
+        root.lang = lang;
+        try { localStorage.setItem('appaz_lang', lang); } catch (e) {}
+      });
+    });
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    const featureObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const cards = e.target.querySelectorAll('.feature');
+          cards.forEach((c, i) => setTimeout(() => c.classList.add('in'), i * 120));
+          featureObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.features').forEach(el => featureObserver.observe(el));
+
+    const accessForm = document.getElementById('accessForm');
+    const ok = document.getElementById('formSuccess');
+    const err = document.getElementById('formError');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (accessForm) {
+      accessForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!accessForm.checkValidity()) { accessForm.reportValidity(); return; }
+        ok.classList.remove('show');
+        err.classList.remove('show');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        try {
+          const data = new FormData(accessForm);
+          const res = await fetch(accessForm.action, {
+            method: 'POST',
+            body: data,
+            headers: { 'Accept': 'application/json' }
+          });
+          if (res.ok) {
+            accessForm.querySelectorAll('input, textarea').forEach(i => i.value = '');
+            ok.classList.add('show');
+          } else {
+            err.classList.add('show');
+          }
+        } catch (e2) {
+          err.classList.add('show');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        }
+      });
+    }
+
+    const modal = document.getElementById('loginModal');
+    const openBtn = document.getElementById('openLogin');
+    const closeBtn = document.getElementById('closeLogin');
+    const loginForm = document.getElementById('loginForm');
+    const loginError = document.getElementById('loginError');
+
+    function openModal() {
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => {
+        const first = modal.querySelector('input');
+        if (first) first.focus();
+      }, 250);
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      loginError.classList.remove('show');
+      loginForm.reset();
+    }
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!loginForm.checkValidity()) { loginForm.reportValidity(); return; }
+        const btn = document.getElementById('loginSubmit');
+        const startedAt = Date.now();
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        loginError.classList.remove('show');
+
+        const email = document.getElementById('l-email').value;
+        const password = document.getElementById('l-pass').value;
+
+        try {
+          await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+          });
+        } catch (netErr) { /* network/abort errors handled below same as 401 */ }
+
+        // Minimum visible latency — real auth endpoints take time to hash passwords
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < 480) await new Promise(r => setTimeout(r, 480 - elapsed));
+
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        loginError.classList.remove('show');
+        void loginError.offsetWidth;
+        loginError.classList.add('show');
+      });
+    }
+
+    document.querySelectorAll('.errorToAccess').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeModal();
+        setTimeout(() => {
+          document.getElementById('access').scrollIntoView({ behavior: 'smooth' });
+        }, 250);
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
