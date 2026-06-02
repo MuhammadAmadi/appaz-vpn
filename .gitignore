@@ -1,9 +1,43 @@
-# Никогда не коммитим
+# Никогда не коммитим: SSL-ключи, БД, рантайм
 *.key
 *.pem
 *.crt
-secrets/
-.env
-cf-token.txt
+*.p12
+*.pfx
+
+# 3x-ui SQLite/Postgres дампы
+*.db
+*.sqlite
+*.sqlite3
 x-ui.db
-config.json
+
+# Логи
+*.log
+*.log.*
+
+# Бэкапы
+*.bak
+*.bak.*
+*.backup
+
+# Окружение
+.env
+.env.*
+.envrc
+
+# Реальные секреты — только шаблоны попадают в репо
+docs/05-secrets.md
+secrets/
+**/secrets.json
+**/credentials.json
+
+# OS-мусор
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Редакторы
+.vscode/
+.idea/
+*.code-workspace

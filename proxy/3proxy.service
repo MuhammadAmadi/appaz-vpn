@@ -1,0 +1,24 @@
+[Unit]
+Description=3proxy tiny proxy server
+Documentation=https://github.com/3proxy/3proxy
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/3proxy.pid
+ExecStart=/usr/local/bin/3proxy /etc/3proxy/3proxy.cfg
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=5s
+
+# Безопасность процесса
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+# Разрешить запись логов (учитывает симлинк /var/log/3proxy → /usr/local/3proxy/logs)
+ReadWritePaths=/var/log/3proxy /usr/local/3proxy/logs /var/run
+
+[Install]
+WantedBy=multi-user.target

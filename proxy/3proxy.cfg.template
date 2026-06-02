@@ -1,0 +1,37 @@
+# 3proxy конфиг — HTTP-релей для Telegram
+# Слушает 8888, разрешает только с ALLOWED_IP + только с правильным паролем
+
+# Daemon-режим (форк в фон)
+daemon
+
+# PID-файл (нужен для systemd-юнита)
+pidfile /var/run/3proxy.pid
+
+# Логи: ротация ежедневно, хранить 7 дней
+log /var/log/3proxy/3proxy.log D
+rotate 7
+logformat "L%C - %U [%d-%m-%Y %H:%M:%S] %T \"%R:%r\" %O %I"
+
+# DNS-серверы (через них резолвятся доменные имена Telegram)
+nserver 1.1.1.1
+nserver 8.8.8.8
+nscache 65536
+
+# Таймауты (стандартные значения)
+timeouts 1 5 30 60 180 1800 15 60
+
+# Юзер для аутентификации (NL = no logging пароля в логи)
+users PROXY_USER:CL:PROXY_PASSWORD
+
+# Тип авторизации:
+# - сначала проверяем IP клиента (cache + iponly)
+# - потом проверяем пароль (strong)
+# Доступ разрешён ТОЛЬКО если: IP в whitelist И правильный пароль
+auth iponly strong
+
+# ACL — кто может пользоваться прокси
+allow * ALLOWED_IP
+deny *
+
+# HTTP-прокси на порту 8888
+proxy -p8888 -a -n
