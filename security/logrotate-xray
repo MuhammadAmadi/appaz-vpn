@@ -1,0 +1,13 @@
+/var/log/xray/*.log /usr/local/x-ui/bin/*.log {
+    daily
+    rotate 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        # x-ui перезапускает Xray сам по сигналу. Не трогаем.
+        true
+    endscript
+}

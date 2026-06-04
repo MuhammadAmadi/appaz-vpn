@@ -1,0 +1,13 @@
+/var/log/x-ui/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        # x-ui сам пересоздаёт файлы — ничего перезагружать не нужно
+        true
+    endscript
+}
