@@ -875,6 +875,7 @@
       }
     }
   </style>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 
@@ -1075,6 +1076,8 @@
             </label>
             <textarea id="f-why" name="why" required></textarea>
           </div>
+                    <!-- Cloudflare Turnstile (защита от ботов) -->
+          <div class="cf-turnstile" data-sitekey="0x4AAAAAADev-V4ffr0LxMo-" data-theme="dark" data-callback="onTurnstileSuccess"></div>
           <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; justify-content: center;">
             <span class="btn-label">
               <span class="lang-en">Submit application</span><span class="lang-ru">Отправить заявку</span>
@@ -1225,6 +1228,15 @@
         submitBtn.style.opacity = '0.6';
         try {
           const data = new FormData(accessForm);
+          // Добавляем Turnstile-токен в форму (Worker его проверит)
+          const tsToken = data.get('cf-turnstile-response');
+          if (!tsToken) {
+            err.classList.add('show');
+            err.querySelector('.lang-en') && (err.querySelector('.lang-en').textContent = 'Please complete the captcha first.');
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+            return;
+          }
           const res = await fetch(accessForm.action, {
             method: 'POST',
             body: data,
@@ -1232,6 +1244,11 @@
           });
           if (res.ok) {
             accessForm.querySelectorAll('input, textarea').forEach(i => i.value = '');
+            // Сбрасываем капчу — каждая отправка требует новой
+            if (window.turnstile) {
+              const widget = document.querySelector('.cf-turnstile');
+              if (widget) window.turnstile.reset(widget);
+            }
             ok.classList.add('show');
           } else {
             err.classList.add('show');
@@ -1317,6 +1334,12 @@
       });
     });
   })();
+
+  // Глобальная callback для Turnstile
+  window.onTurnstileSuccess = function(token) {
+    // Можно добавить визуальный фидбек что капча пройдена
+    console.log('Turnstile passed');
+  };
 </script>
 
 </body>

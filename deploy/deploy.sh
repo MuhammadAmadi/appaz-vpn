@@ -48,6 +48,43 @@ ask_secret() {
     eval "$var=\"$value\""
 }
 
+
+# ── Подключение библиотек уведомлений (notify.sh + report.sh) ───────────────
+SCRIPT_DIR_BOOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[ -f "$SCRIPT_DIR_BOOT/lib/notify.sh" ] && source "$SCRIPT_DIR_BOOT/lib/notify.sh"
+[ -f "$SCRIPT_DIR_BOOT/lib/report.sh" ] && source "$SCRIPT_DIR_BOOT/lib/report.sh"
+
+# Засекаем время старта
+SCRIPT_START_TS=$(date +%s)
+
+# Глобальный обработчик ошибок — шлёт в TG при падении скрипта
+on_error() {
+    local exit_code=$?
+    local line_no=$1
+    if [ "$exit_code" -ne 0 ]; then
+        tg_notify_error "deploy.sh failed (exit $exit_code) at line $line_no" "Host: $(hostname)"
+    fi
+}
+trap 'on_error $LINENO' ERR
+
+# Спрашиваем про TG-уведомления (если ещё не настроены)
+setup_tg_notifications() {
+    if [ -f /etc/appaz/notify.env ] && [ -n "${TG_BOT_TOKEN:-}" ] && [ -n "${TG_CHAT_ID:-}" ]; then
+        log "TG-уведомления: используются настройки из /etc/appaz/notify.env"
+        return 0
+    fi
+    if ask_yn "Включить Telegram-уведомления о ходе установки?" Y; then
+        ask_secret "Telegram bot token" TG_BOT_TOKEN
+        ask_str    "Telegram chat ID"   TG_CHAT_ID
+        tg_save_config
+        log "TG-уведомления настроены и сохранены в /etc/appaz/notify.env"
+    else
+        log "TG-уведомления отключены"
+        TG_BOT_TOKEN=""
+        TG_CHAT_ID=""
+    fi
+}
+
 # ── Парсинг аргументов ──────────────────────────────────────────────────────
 AUTO=0
 for arg in "$@"; do
@@ -117,11 +154,23 @@ step "Резюме"
 echo "  Base packages:    $([ "$INSTALL_BASE" = "1" ] && echo YES || echo no)"
 echo "  sysctl-hardening: $([ "$INSTALL_SYSCTL" = "1" ] && echo YES || echo no)"
 echo "  ufw:              $([ "$INSTALL_UFW" = "1" ] && echo YES || echo no)"
-echo "  nginx + LE:       $([ "$INSTALL_NGINX" = "1" ] && echo YES (domain=$DOMAIN, method=$SSL_METHOD) || echo no)"
+if [ "$INSTALL_NGINX" = "1" ]; then echo "  nginx + LE:       YES (domain=$DOMAIN, method=$SSL_METHOD)"; else echo "  nginx + LE:       no"; fi
 echo "  3x-ui:            $([ "$INSTALL_XUI" = "1" ] && echo YES || echo no)"
-echo "  3proxy:           $([ "$INSTALL_3PROXY" = "1" ] && echo YES (user=$PROXY_USER, whitelist=$PROXY_ALLOWED_IP) || echo no)"
+if [ "$INSTALL_3PROXY" = "1" ]; then echo "  3proxy:           YES (user=$PROXY_USER, whitelist=$PROXY_ALLOWED_IP)"; else echo "  3proxy:           no"; fi
 echo "  fail2ban:         $([ "$INSTALL_FAIL2BAN" = "1" ] && echo YES || echo no)"
 ask_yn "Продолжить установку?" Y || { warn "Отмена пользователем"; exit 0; }
+
+# ── Настройка TG-уведомлений (после wizard'а, до начала установки) ──────────
+setup_tg_notifications
+
+# Старт-сообщение в TG
+SERVER_PUBLIC_IP=$(curl -s4 -m 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+tg_notify "🟢 deploy.sh started
+Host: $(hostname)
+IP: ${SERVER_PUBLIC_IP}
+Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # ШАГ 1: Базовые пакеты
@@ -162,7 +211,7 @@ if [ "$INSTALL_UFW" = "1" ]; then
     ufw allow 443/tcp  comment 'HTTPS'
     ufw allow 443/udp  comment 'Hysteria2 main'
     ufw allow 1443/udp comment 'Hysteria2 4G'
-    ufw allow 4443/tcp comment 'VLESS Reality'
+    ufw allow 8443/tcp comment 'VLESS Reality'
     ufw allow 2053/tcp comment 'VLESS gRPC'
     ufw allow 2083/tcp comment '3x-ui panel'
     ufw allow 2096/tcp comment '3x-ui subscription'
@@ -342,7 +391,7 @@ $([ "$INSTALL_FAIL2BAN" = "1" ] && echo "║  ✓ fail2ban + 4 jail             
    • NL WS 2:      port=10005  listen=127.0.0.1  protocol=vless  network=ws  path=/ws-vpn-2
    • NL HYSTERIA:  port=443    protocol=hysteria2 (UDP, основной)
    • NL HYSTERIA 4G: port=1443 protocol=hysteria2 (UDP, бэкап)
-   • NL VLESS Reality: port=4443  protocol=vless  security=reality  donor=www.sony.com
+   • NL VLESS Reality: port=8443  protocol=vless  security=reality  donor=www.sony.com
    • NL GRPC:      port=2053  protocol=vless  network=grpc
 
 2. Закрой SSH-вход по паролю:
@@ -359,4 +408,19 @@ $([ "$INSTALL_FAIL2BAN" = "1" ] && echo "║  ✓ fail2ban + 4 jail             
 
 SUMMARY
 
-log "Готово. Удачи."
+# ── Финальные действия: JSON-отчёт + время + TG ────────────────────────────
+SCRIPT_END_TS=$(date +%s)
+ELAPSED=$((SCRIPT_END_TS - SCRIPT_START_TS))
+ELAPSED_MIN=$((ELAPSED / 60))
+ELAPSED_SEC=$((ELAPSED % 60))
+
+if [ "$INSTALL_XUI" = "1" ] && [ -n "${TG_BOT_TOKEN:-}" ]; then
+    log "Шлю отчёт для мастер-сервера в Telegram"
+    report_panel_to_tg_interactive "${DOMAIN:-appaz.xyz}" || warn "Не удалось отправить отчёт в TG"
+fi
+
+tg_notify "✅ deploy.sh finished
+Host: $(hostname)
+Duration: ${ELAPSED_MIN}m ${ELAPSED_SEC}s"
+
+log "Готово за ${ELAPSED_MIN}m ${ELAPSED_SEC}s. Удачи."
