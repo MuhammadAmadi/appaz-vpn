@@ -81,14 +81,32 @@ sudo -u postgres psql -d xui -c "SELECT id, remark, port, listen FROM inbounds W
 
 **Симптом**: `journalctl -u 3proxy` показывает `/var/log/3proxy/...: Read-only file system`.
 
-**Причина**: systemd-юнит с `ProtectSystem=full` запрещает запись везде кроме `/home`, `/root`, `/etc`. Лог-каталог 3proxy находится через симлинк на `/usr/local/3proxy/logs`, попадает в read-only.
+**Причина**: systemd-юнит с `ProtectSystem=full` держит `/usr`, `/boot`, `/etc` read-only. Лог-каталогу 3proxy (`/var/log/3proxy`) и pid-файлу (`/var/run/3proxy.pid`) нужна явная запись.
 
-**Лечение**: добавить в `[Service]` юнита:
+**Лечение**: в `[Service]` юнита:
 ```ini
-ReadWritePaths=/var/log/3proxy /usr/local/3proxy/logs /var/run
+ReadWritePaths=/var/log/3proxy /var/run
 ```
 
 Уже добавлено в `proxy/3proxy.service`.
+
+## 3proxy не стартует — status=226/NAMESPACE, "Failed to set up mount namespacing"
+
+**Симптом**: `systemctl status 3proxy` → `code=exited, status=226/NAMESPACE`. В `journalctl -xeu 3proxy`:
+```
+Failed to set up mount namespacing: /usr/local/3proxy/logs: No such file or directory
+```
+
+**Причина**: `ReadWritePaths=` в systemd падает с 226/NAMESPACE, если хотя бы один из перечисленных путей физически не существует на диске — systemd не может подготовить bind-mount для несуществующей директории. В старой версии юнита в `ReadWritePaths` был путь `/usr/local/3proxy/logs` (расчёт на симлинк, которого `deploy.sh` никогда не создавал).
+
+**Лечение**: убрать несуществующий путь из `ReadWritePaths` (оставить только реально создаваемые `deploy.sh` каталоги: `/var/log/3proxy` и `/var/run`). Уже исправлено в `proxy/3proxy.service`.
+
+Если правите юнит вручную на уже установленном сервере:
+```bash
+systemctl edit --full 3proxy.service   # убрать /usr/local/3proxy/logs из ReadWritePaths
+systemctl daemon-reload
+systemctl restart 3proxy
+```
 
 ## 3proxy package требует glibc 2.38 а у нас 2.35
 

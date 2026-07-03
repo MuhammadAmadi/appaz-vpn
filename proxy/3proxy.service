@@ -17,8 +17,8 @@ NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
 PrivateTmp=true
-# Разрешить запись логов (учитывает симлинк /var/log/3proxy → /usr/local/3proxy/logs)
-ReadWritePaths=/var/log/3proxy /usr/local/3proxy/logs /var/run
+# Разрешить запись логов и pid-файла
+ReadWritePaths=/var/log/3proxy /var/run
 
 [Install]
 WantedBy=multi-user.target
