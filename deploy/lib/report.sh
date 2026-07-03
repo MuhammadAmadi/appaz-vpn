@@ -48,6 +48,27 @@ reset_panel_password() {
     echo "$new_pass"
 }
 
+# Определяет глобальный IPv6-адрес сервера, перебирая несколько сервисов
+# (один ifconfig.me иногда 403-ит определённые ASN/подсети хостеров —
+# в этом случае тело ответа не должно попасть в отчёт как IP).
+detect_ipv6() {
+    local urls=(
+        "https://api6.ipify.org"
+        "https://ipv6.icanhazip.com"
+        "https://v6.ident.me"
+        "https://ifconfig.me"
+    )
+    local url out
+    for url in "${urls[@]}"; do
+        out=$(curl -s6 -m 5 "$url" 2>/dev/null | tr -d '[:space:]')
+        if [[ "$out" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$out" == *:* ]]; then
+            echo "$out"
+            return 0
+        fi
+    done
+    echo ""
+}
+
 # Собирает JSON для мастера.
 # Аргументы:
 #   $1 — domain
@@ -59,8 +80,7 @@ build_report_json() {
     local ip ipv6
     ip=$(curl -s4 -m 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
     [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || ip=""
-    ipv6=$(curl -s6 -m 5 ifconfig.me 2>/dev/null || echo "")
-    [[ "$ipv6" =~ ^[0-9a-fA-F:]+$ ]] || ipv6=""
+    ipv6=$(detect_ipv6)
 
     local panel_port panel_path panel_user panel_pass_line
     panel_port=$(get_setting "webPort")
