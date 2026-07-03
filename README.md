@@ -3,26 +3,32 @@
 VPN-сервер замаскированный под легитимный HTTPS-сайт. Снаружи — лендинг закрытого бета-стартапа cloud gaming. Внутри секретные пути ведут к VLESS+WS и Hysteria2.
 
 ## Архитектура (TL;DR)
+
+```
 Клиенты в РФ
-↓ HTTPS
-↓ Серая тучка Cloudflare (DNS-only, не CF-диапазон)
+  ↓ HTTPS
+  ↓ Серая тучка Cloudflare (DNS-only, не CF-диапазон)
 nginx 1.30 на 443/tcp
-├─ GET /                          → сайт-заглушка appaz
-├─ POST /api/auth/login           → 401 (ловушка)
-├─ POST /api/apply/access         → CF Worker (форма заявок)
-├─ WS /api/render/stream          → 127.0.0.1:10000 (VLESS канал 1)
-└─ WS /ws-vpn-2                   → 127.0.0.1:10005 (VLESS канал 2)
+├─ GET  /                     → сайт-заглушка appaz
+├─ POST /api/auth/login       → 401 (ловушка)
+├─ POST /api/apply/access     → CF Worker (форма заявок)
+├─ WS   /api/render/stream    → 127.0.0.1:10000 (VLESS канал 1)
+└─ WS   /ws-vpn-2             → 127.0.0.1:10005 (VLESS канал 2)
+
 Параллельно на сервере:
-├─ Hysteria2 на 443/udp (donor SNI: www.cloudflare.com)
-├─ Hysteria2 на 1443/udp (бэкап для мобильного интернета)
-├─ VLESS Reality на 4443/tcp (donor SNI: www.sony.com)
-├─ VLESS gRPC на 2053/tcp
-├─ 3proxy на 8888/tcp (HTTP-релей для TG-бота, whitelist+пароль)
-└─ 3x-ui панель на 2083/tcp + подписка на 2096/tcp
+├─ Hysteria2    на 443/udp    (donor SNI: www.cloudflare.com, основной)
+├─ Hysteria2    на 1443/udp   (бэкап для мобильного интернета)
+├─ VLESS Reality на 4443/tcp  (donor SNI: www.sony.com)
+├─ VLESS gRPC   на 2053/tcp
+├─ 3proxy       на 8888/tcp   (HTTP-релей для TG-бота, whitelist+пароль)
+└─ 3x-ui панель на 2083/tcp   (+ подписка на 2096/tcp)
+```
 
 Подробнее см. [`docs/02-architecture.md`](docs/02-architecture.md).
 
 ## Структура репо
+
+```
 .
 ├── deploy/
 │   └── deploy.sh                 # Универсальный установщик (интерактив + --auto)
@@ -50,6 +56,7 @@ nginx 1.30 на 443/tcp
 │   └── CHANGELOG.md              # История значимых изменений
 ├── .gitignore
 └── README.md
+```
 
 ## Развёртывание на новом сервере
 
