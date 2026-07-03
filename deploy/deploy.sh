@@ -94,6 +94,7 @@ for arg in "$@"; do
             cat <<HELP
 Usage: $0 [--auto]
 Environment variables (для --auto):
+  SSH_PORT        порт, на котором слушает sshd (по умолчанию 22)
   DOMAIN          основной домен (например appaz.xyz)
   EMAIL           email для Let's Encrypt
   CF_TOKEN        Cloudflare API Token для DNS-01
@@ -128,6 +129,16 @@ ask_yn "[5/7] 3x-ui панель (с PostgreSQL)"                      Y && INST
 ask_yn "[6/7] 3proxy (HTTP-релей с whitelist+пароль)"           N && INSTALL_3PROXY=1 || INSTALL_3PROXY=0
 ask_yn "[7/7] fail2ban + наши nginx-фильтры"                    Y && INSTALL_FAIL2BAN=1 || INSTALL_FAIL2BAN=0
 
+# ── Параметры ufw (SSH-порт) ─────────────────────────────────────────────────
+if [ "$INSTALL_UFW" = "1" ]; then
+    step "Параметры ufw"
+    SSHD_CURRENT_PORT=$(grep -Po '^\s*Port\s+\K[0-9]+' /etc/ssh/sshd_config 2>/dev/null | tail -1)
+    ask_str "SSH порт (на котором реально слушает sshd)" SSH_PORT "${SSHD_CURRENT_PORT:-22}"
+    if [ -n "$SSHD_CURRENT_PORT" ] && [ "$SSHD_CURRENT_PORT" != "$SSH_PORT" ]; then
+        warn "sshd сейчас слушает на $SSHD_CURRENT_PORT, а не на $SSH_PORT — проверь, не отрежет ли ufw доступ!"
+    fi
+fi
+
 # ── Параметры (если nginx или 3proxy будут ставиться) ───────────────────────
 if [ "$INSTALL_NGINX" = "1" ]; then
     step "Параметры nginx + SSL"
@@ -153,7 +164,7 @@ fi
 step "Резюме"
 echo "  Base packages:    $([ "$INSTALL_BASE" = "1" ] && echo YES || echo no)"
 echo "  sysctl-hardening: $([ "$INSTALL_SYSCTL" = "1" ] && echo YES || echo no)"
-echo "  ufw:              $([ "$INSTALL_UFW" = "1" ] && echo YES || echo no)"
+if [ "$INSTALL_UFW" = "1" ]; then echo "  ufw:              YES (SSH port=$SSH_PORT)"; else echo "  ufw:              no"; fi
 if [ "$INSTALL_NGINX" = "1" ]; then echo "  nginx + LE:       YES (domain=$DOMAIN, method=$SSL_METHOD)"; else echo "  nginx + LE:       no"; fi
 echo "  3x-ui:            $([ "$INSTALL_XUI" = "1" ] && echo YES || echo no)"
 if [ "$INSTALL_3PROXY" = "1" ]; then echo "  3proxy:           YES (user=$PROXY_USER, whitelist=$PROXY_ALLOWED_IP)"; else echo "  3proxy:           no"; fi
@@ -206,7 +217,7 @@ if [ "$INSTALL_UFW" = "1" ]; then
     ufw default deny incoming
     ufw default allow outgoing
     ufw default deny routed
-    ufw limit 22/tcp comment 'SSH with rate-limit'
+    ufw limit "$SSH_PORT"/tcp comment 'SSH with rate-limit'
     ufw allow 80/tcp   comment 'HTTP (LE challenge)'
     ufw allow 443/tcp  comment 'HTTPS'
     ufw allow 443/udp  comment 'Hysteria2 main'
