@@ -125,7 +125,7 @@ ask_yn "[1/7] Базовые пакеты (curl, git, ufw, build-essential)" Y &
 ask_yn "[2/7] sysctl-hardening (защита ядра от SYN-flood/MITM)" Y && INSTALL_SYSCTL=1 || INSTALL_SYSCTL=0
 ask_yn "[3/7] ufw + правила (открыть стандартные порты)"       Y && INSTALL_UFW=1 || INSTALL_UFW=0
 ask_yn "[4/7] nginx 1.30 + acme.sh + Let's Encrypt сертификат" Y && INSTALL_NGINX=1 || INSTALL_NGINX=0
-ask_yn "[5/7] 3x-ui панель (SQLite)"                            Y && INSTALL_XUI=1 || INSTALL_XUI=0
+ask_yn "[5/7] 3x-ui панель (выбор SQLite/PostgreSQL в установщике)" Y && INSTALL_XUI=1 || INSTALL_XUI=0
 ask_yn "[6/7] 3proxy (HTTP-релей с whitelist+пароль)"           N && INSTALL_3PROXY=1 || INSTALL_3PROXY=0
 ask_yn "[7/7] fail2ban + наши nginx-фильтры"                    Y && INSTALL_FAIL2BAN=1 || INSTALL_FAIL2BAN=0
 
@@ -304,12 +304,29 @@ if [ "$INSTALL_XUI" = "1" ]; then
     if [ -d "/usr/local/x-ui" ]; then
         warn "3x-ui уже установлен в /usr/local/x-ui, пропускаем"
     else
-        # SQLite (дефолт установщика, рекомендован для < 500 клиентов).
-        # НЕ передаём XUI_DB_TYPE=postgres: в NONINTERACTIVE-режиме эта env-переменная
-        # наследуется бинарником x-ui, который вызывается для чтения настроек ещё до
-        # создания DSN → "Database initialization failed" и пустой порт/логин панели.
-        # Данные панели забираем из /etc/x-ui/install-result.env (см. lib/report.sh).
-        bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) <<< $'\n\n\n\n\n\n'
+        # Запускаем ОФИЦИАЛЬНЫЙ установщик ИНТЕРАКТИВНО — чтобы его родной вопрос
+        # выбора БД (SQLite / PostgreSQL) видел ты и отвечал сам.
+        # Почему не через env XUI_DB_TYPE=postgres: в неинтерактивном режиме эта
+        # переменная наследуется бинарником x-ui, которого установщик вызывает для
+        # чтения настроек ещё ДО создания DSN → "Database initialization failed".
+        # В интерактиве БД ставится в правильном порядке, проблемы нет.
+        echo
+        warn "Сейчас запустится интерактивный установщик 3x-ui. Ответь на его вопросы:"
+        warn "  • Database Selection: для большого числа клиентов (тысячи) выбирай 2) PostgreSQL,"
+        warn "    для небольшого — 1) SQLite. PostgreSQL: далее выбери 1) Install locally."
+        warn "  • Panel Port: можно оставить случайный (Enter) или задать свой."
+        warn "  • SSL Certificate Setup: выбирай 4) Skip SSL — TLS у нас терминирует nginx"
+        warn "    (панель за реверс-прокси). Опции 1-3 тут не нужны."
+        echo
+        if [ -e /dev/tty ]; then
+            bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) </dev/tty
+        else
+            # Нет терминала (--auto / CI): установщик уйдёт в NONINTERACTIVE и поставит
+            # SQLite. Для PostgreSQL в этом режиме задай XUI_DB_TYPE=postgres и XUI_DB_DSN
+            # заранее (см. docs), иначе панель ставится на SQLite по умолчанию.
+            warn "Нет /dev/tty — установщик 3x-ui пойдёт неинтерактивно (по умолчанию SQLite)."
+            bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) <<< $'\n\n\n\n\n\n'
+        fi
         log "3x-ui установлен. Доступ: x-ui (CLI) или https://SERVER:RANDOM_PORT/PATH"
         warn "ВНИМАНИЕ: запиши логин/пароль/порт/путь из вывода установщика выше!"
     fi

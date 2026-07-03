@@ -140,14 +140,16 @@ systemctl restart 3proxy
 
 **Причина**: попытка форсить PostgreSQL через `XUI_DB_TYPE=postgres` в окружении. В NONINTERACTIVE-режиме (stdin не TTY) эта переменная наследуется **бинарником** `x-ui`, которого установщик вызывает для чтения текущих настроек (`x-ui setting -show`) ещё до того, как создан DSN. Бинарник падает на инициализации БД, `config_after_install` получает мусор и не задаёт порт/логин.
 
-**Лечение**: НЕ передавать `XUI_DB_TYPE`. Ставим на SQLite (дефолт установщика, рекомендован для < 500 клиентов). Данные панели `report.sh` берёт не из БД, а из `/etc/x-ui/install-result.env` — установщик пишет туда user/port/path/token независимо от типа БД. Уже исправлено в `deploy/deploy.sh` и `lib/report.sh`.
+**Лечение**: НЕ передавать `XUI_DB_TYPE` через env и НЕ проматывать промпты heredoc'ом. `deploy.sh` запускает установщик 3x-ui **интерактивно** (`</dev/tty`) — его родной вопрос «Database Selection (1 SQLite / 2 PostgreSQL)» задаётся тебе, и БД ставится в правильном порядке. Для тысяч клиентов выбирай `2) PostgreSQL` → `1) Install locally`. Данные панели `report.sh` берёт из `/etc/x-ui/install-result.env` (установщик пишет туда user/port/path/token при любой БД). Исправлено в `deploy/deploy.sh` и `lib/report.sh`.
 
 Если сервер уже получил сломанную установку — переустановить панель начисто:
 ```bash
 /usr/local/x-ui/x-ui uninstall   # снесёт x-ui (инбаунды на свежей установке ещё не созданы)
 cd /opt/appaz-vpn && git pull origin main
-bash deploy/deploy.sh            # ответить только на шаг 3x-ui = Y, остальное n
+bash deploy/deploy.sh            # ответить только на шаг 3x-ui = Y, остальное n; выбрать PostgreSQL
 ```
+
+**Примечание про `--auto`**: в неинтерактивном режиме `/dev/tty` недоступен, установщик уходит в NONINTERACTIVE и ставит SQLite. Для PostgreSQL в auto-режиме придётся заранее поднять postgres и передать `XUI_DB_TYPE=postgres` + `XUI_DB_DSN=...` (интерактивный путь надёжнее).
 
 ## Отчёт в Telegram приходит с битым JSON в поле `ipv6`
 
