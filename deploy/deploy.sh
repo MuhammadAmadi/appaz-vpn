@@ -278,9 +278,11 @@ PIN
     log "Сертификат установлен в /etc/ssl/private/"
 
     step "Установка конфига nginx + сайта"
+    # nginx из репозитория nginx.org не создаёт sites-available/sites-enabled
+    # (это дебиановская конвенция) — создаём сами до копирования конфига.
+    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/conf.d
     cp -v "$REPO_ROOT/nginx/nginx.conf" /etc/nginx/nginx.conf
     cp -v "$REPO_ROOT/nginx/appaz.conf" /etc/nginx/sites-available/appaz
-    mkdir -p /etc/nginx/sites-enabled
     ln -sf /etc/nginx/sites-available/appaz /etc/nginx/sites-enabled/appaz
     rm -f /etc/nginx/conf.d/default.conf 2>/dev/null
 
