@@ -3,33 +3,38 @@
 # report.sh — генерирует финальный JSON-отчёт для мастера
 # ============================================================================
 
-# Достаёт API-токен или создаёт новый master-integration
-get_or_create_api_token() {
-    local token_name="master-integration"
-    local existing
-    existing=$(sudo -u postgres psql -d xui -At -c "SELECT token FROM api_tokens WHERE name = '$token_name';" 2>/dev/null)
-    if [ -n "$existing" ]; then
-        echo "$existing"
-        return 0
-    fi
-    local new_token
-    new_token=$(openssl rand -base64 36 | tr -d '/+=\n' | head -c 48)
-    local now_ms=$(( $(date +%s) * 1000 ))
-    sudo -u postgres psql -d xui -c \
-      "INSERT INTO api_tokens (name, token, enabled, created_at) VALUES ('$token_name', '$new_token', true, $now_ms);" \
-      >/dev/null 2>&1
-    echo "$new_token"
+# Файл, который официальный установщик 3x-ui пишет после установки (mode 600).
+# Содержит XUI_USERNAME/XUI_PASSWORD/XUI_PANEL_PORT/XUI_WEB_BASE_PATH/
+# XUI_API_TOKEN/XUI_ACCESS_URL/XUI_DB_TYPE. Работает независимо от типа БД
+# (SQLite или PostgreSQL) — поэтому берём данные панели отсюда, а не из psql.
+XUI_INSTALL_RESULT="/etc/x-ui/install-result.env"
+
+# Достаёт одно значение из install-result.env, не засоряя глобальные переменные.
+# Файл source-able (значения записаны через printf '%q'), читаем в subshell.
+xui_result_get() {
+    local key="$1"
+    [ -f "$XUI_INSTALL_RESULT" ] || return 0
+    ( set -a; . "$XUI_INSTALL_RESULT" >/dev/null 2>&1; printf '%s' "${!key}" )
 }
 
-# Достаёт значение из таблицы settings
+# API-токен мастер-интеграции: установщик генерит его сам и кладёт в install-result.env.
+get_or_create_api_token() {
+    xui_result_get XUI_API_TOKEN
+}
+
+# webPort / webBasePath — из install-result.env (ключи XUI_PANEL_PORT / XUI_WEB_BASE_PATH).
 get_setting() {
     local key="$1"
-    sudo -u postgres psql -d xui -At -c "SELECT value FROM settings WHERE key = '$key';" 2>/dev/null
+    case "$key" in
+        webPort)     xui_result_get XUI_PANEL_PORT ;;
+        webBasePath) xui_result_get XUI_WEB_BASE_PATH ;;
+        *)           : ;;
+    esac
 }
 
-# Достаёт username администратора панели (пароль в БД — bcrypt, нечитаем)
+# Username администратора панели.
 get_panel_username() {
-    sudo -u postgres psql -d xui -At -c "SELECT username FROM users ORDER BY id LIMIT 1;" 2>/dev/null
+    xui_result_get XUI_USERNAME
 }
 
 # Сбрасывает пароль панели на свежий случайный, возвращает в чистом виде.

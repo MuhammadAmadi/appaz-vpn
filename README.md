@@ -58,25 +58,49 @@ nginx 1.30 на 443/tcp
 └── README.md
 ```
 
-## Развёртывание на новом сервере
+## Что подготовить заранее
+
+Перед запуском убедись, что всё это готово — иначе установка споткнётся на шаге nginx/SSL:
+
+1. **VPS на Ubuntu 22.04 или 24.04**, доступ под `root`.
+2. **Домен на Cloudflare** с **серой тучкой** (DNS-only). Жёлтую тучку для основного домена РКН режет — см. `docs/03-troubleshooting.md`.
+3. **Cloudflare API Token** со scope `Zone:DNS:Edit` для нужной зоны (для DNS-01 валидации сертификата).
+4. **DNS-записи** заранее на IP сервера:
+   - `A` — основной домен (напр. `usa.appaz.xyz`) → IPv4 сервера.
+   - `AAAA` — тот же домен → IPv6 сервера (если у сервера есть IPv6; узнать: `curl -s https://api6.ipify.org`).
+5. **SSH-порт**: если ты уже перевесил sshd на нестандартный порт (напр. 1922) — держи его под рукой, установщик спросит (по умолчанию подставит порт из `/etc/ssh/sshd_config`, иначе 22). Это критично: ufw откроет **только** указанный порт, чтобы не отрезать тебе доступ.
+
+## Развёртывание на новом сервере (одна команда)
+
+> ⚠️ **Репозиторий должен быть публичным на время установки.**
+> One-liner тянет `bootstrap.sh` через `raw.githubusercontent.com` и клонирует репо **без токена**. Для приватного репо GitHub отдаёт `404`, и команда молча не сработает.
+> Перед установкой: **GitHub → репозиторий → Settings → Danger Zone → Change visibility → Public**.
+> После успешной установки репо можно снова сделать приватным — серверу он больше не нужен (сертификат продлевается через acme.sh, не через git).
+
+На чистом сервере под `root`:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/MuhammadAmadi/appaz-vpn/main/deploy/bootstrap.sh | bash
+```
+
+`bootstrap.sh` сам поставит git/curl, склонирует репо в `/opt/appaz-vpn`, проверит SHA256-целостность `deploy.sh` и запустит интерактивный wizard.
+
+Wizard спросит: какие из 7 компонентов ставить (каждый `Y/n`), SSH-порт, домен, email, Cloudflare API Token, логин/пароль/whitelist для 3proxy, и Telegram-бота для уведомлений. В конце покажет summary и **сгенерированные логин/пароль/порт/путь панели 3x-ui — их нужно сразу сохранить** (они также лежат в `/etc/x-ui/install-result.env`, mode 600).
+
+После установки останется вручную создать инбаунды в 3x-ui — точные параметры печатает финальный экран.
+
+### Альтернатива: вручную (для приватного репо)
+
+Если не хочешь делать репо публичным — склонируй с Personal Access Token:
 
 ```bash
 apt update && apt install -y git
-git clone https://github.com/MuhammadAmadi/appaz-vpn.git /opt/appaz-vpn
+git clone https://github.com/MuhammadAmadi/appaz-vpn.git /opt/appaz-vpn   # логин + PAT вместо пароля
 cd /opt/appaz-vpn
 bash deploy/deploy.sh
 ```
 
-Скрипт интерактивный: спросит какие компоненты ставить (7 шагов, каждый Y/n), домен, email, Cloudflare API Token, и т.д. После завершения останется создать инбаунды в 3x-ui панели руками — финальный summary покажет точные параметры.
-
-Для автоматизации есть неинтерактивный режим — см. [`docs/01-quickstart.md`](docs/01-quickstart.md).
-
-## Что нужно заранее
-
-1. VPS на Ubuntu 22.04/24.04
-2. Домен на Cloudflare с серой тучкой
-3. Cloudflare API Token (Zone:DNS:Edit)
-4. A-записи: `appaz.xyz` и `www.appaz.xyz` на IP сервера, `api.appaz.xyz` на CF Worker (жёлтая тучка)
+Для полностью неинтерактивной установки (`--auto` + env-переменные) — см. [`docs/01-quickstart.md`](docs/01-quickstart.md).
 
 ## Защита
 
