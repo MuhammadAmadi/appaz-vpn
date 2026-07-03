@@ -132,7 +132,9 @@ ask_yn "[7/7] fail2ban + наши nginx-фильтры"                    Y && 
 # ── Параметры ufw (SSH-порт) ─────────────────────────────────────────────────
 if [ "$INSTALL_UFW" = "1" ]; then
     step "Параметры ufw"
-    SSHD_CURRENT_PORT=$(grep -Po '^\s*Port\s+\K[0-9]+' /etc/ssh/sshd_config 2>/dev/null | tail -1)
+    # `|| true` обязателен: при дефолтном sshd_config (строка `Port` закомментирована)
+    # grep ничего не находит и возвращает 1, что под `set -e`+`pipefail` уронило бы скрипт.
+    SSHD_CURRENT_PORT=$(grep -Po '^\s*Port\s+\K[0-9]+' /etc/ssh/sshd_config 2>/dev/null | tail -1 || true)
     ask_str "SSH порт (на котором реально слушает sshd)" SSH_PORT "${SSHD_CURRENT_PORT:-22}"
     if [ -n "$SSHD_CURRENT_PORT" ] && [ "$SSHD_CURRENT_PORT" != "$SSH_PORT" ]; then
         warn "sshd сейчас слушает на $SSHD_CURRENT_PORT, а не на $SSH_PORT — проверь, не отрежет ли ufw доступ!"
