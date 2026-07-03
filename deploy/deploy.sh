@@ -300,7 +300,7 @@ if [ "$INSTALL_XUI" = "1" ]; then
     if [ -d "/usr/local/x-ui" ]; then
         warn "3x-ui уже установлен в /usr/local/x-ui, пропускаем"
     else
-        bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) <<< $'\n\n\n\n\n\n'
+        XUI_DB_TYPE=postgres bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) <<< $'\n\n\n\n\n\n'
         log "3x-ui установлен. Доступ: x-ui (CLI) или https://SERVER:RANDOM_PORT/PATH"
         warn "ВНИМАНИЕ: запиши логин/пароль/порт/путь из вывода установщика выше!"
     fi

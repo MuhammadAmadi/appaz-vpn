@@ -58,7 +58,9 @@ build_report_json() {
 
     local ip ipv6
     ip=$(curl -s4 -m 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+    [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || ip=""
     ipv6=$(curl -s6 -m 5 ifconfig.me 2>/dev/null || echo "")
+    [[ "$ipv6" =~ ^[0-9a-fA-F:]+$ ]] || ipv6=""
 
     local panel_port panel_path panel_user panel_pass_line
     panel_port=$(get_setting "webPort")
