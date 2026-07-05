@@ -302,9 +302,22 @@ PIN
     log "nginx запущен. Test: curl -ksI https://$DOMAIN/ | head -3"
 fi
 
-# Предпочтительные настройки подписки 3x-ui (можно переопределить через env).
-XUI_SUB_PATH="${XUI_SUB_PATH:-/siha-vpn-sub/}"
-XUI_SUB_JSON_PATH="${XUI_SUB_JSON_PATH:-/siha-vpn-sub-json/}"
+# Случайный сегмент URI-пути (буквы+цифры, 16 символов) для путей подписки.
+gen_rand_path() {
+    local s
+    s=$(openssl rand -base64 18 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c 16)
+    [ -z "$s" ] && s=$(head -c 64 /dev/urandom 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c 16)
+    [ -z "$s" ] && s="sub$(date +%s)"
+    echo "$s"
+}
+
+# Предпочтительные настройки подписки 3x-ui.
+# Пути по умолчанию РАНДОМНЫЕ — на каждой ноде свои, так труднее нащупать
+# подписку сканером (пути не обязаны совпадать между серверами: клиент
+# получает полную ссылку с доменом и путём от самой панели).
+# Можно зафиксировать свой путь через env XUI_SUB_PATH / XUI_SUB_JSON_PATH.
+XUI_SUB_PATH="${XUI_SUB_PATH:-/$(gen_rand_path)/}"
+XUI_SUB_JSON_PATH="${XUI_SUB_JSON_PATH:-/$(gen_rand_path)/}"
 XUI_REMARK_TEMPLATE="${XUI_REMARK_TEMPLATE:-{{INBOUND}}|📊{{TRAFFIC_LEFT}}|⏳{{DAYS_LEFT}}D}"
 
 # Применяет наши настройки подписки к БД панели 3x-ui.
