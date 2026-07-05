@@ -302,6 +302,53 @@ PIN
     log "nginx запущен. Test: curl -ksI https://$DOMAIN/ | head -3"
 fi
 
+# Предпочтительные настройки подписки 3x-ui (можно переопределить через env).
+XUI_SUB_PATH="${XUI_SUB_PATH:-/siha-vpn-sub/}"
+XUI_SUB_JSON_PATH="${XUI_SUB_JSON_PATH:-/siha-vpn-sub-json/}"
+XUI_REMARK_TEMPLATE="${XUI_REMARK_TEMPLATE:-{{INBOUND}}|📊{{TRAFFIC_LEFT}}|⏳{{DAYS_LEFT}}D}"
+
+# Применяет наши настройки подписки к БД панели 3x-ui.
+# УСТОЙЧИВОСТЬ К БУДУЩИМ ВЕРСИЯМ: шаг сугубо best-effort — при любой смене
+# схемы (переименование таблицы `settings`/ключей, другой тип БД) он тихо
+# пропускается и НИКОГДА не роняет установку. Обновляются только уже
+# существующие ключи (UPDATE ... WHERE key=...), новые не создаются.
+apply_xui_sub_settings() {
+    local dbtype
+    dbtype=$(xui_result_get XUI_DB_TYPE 2>/dev/null)
+    [ -z "$dbtype" ] && dbtype=$(grep -oP 'XUI_DB_TYPE=\K\S+' /etc/default/x-ui 2>/dev/null || echo sqlite)
+
+    # db_exec <sql> — выполняет SQL, печатает результат; ошибки/несовместимость → пусто.
+    local db_exec
+    if [ "$dbtype" = "postgres" ]; then
+        command -v psql >/dev/null 2>&1 || { warn "psql не найден — пропускаю донастройку подписки (настрой вручную в панели)"; return 0; }
+        db_exec() { sudo -u postgres psql -d xui -tAc "$1" 2>/dev/null; }
+    else
+        local dbfile=/etc/x-ui/x-ui.db
+        command -v sqlite3 >/dev/null 2>&1 || { warn "sqlite3 не найден — пропускаю донастройку подписки (настрой вручную в панели)"; return 0; }
+        [ -f "$dbfile" ] || { warn "БД $dbfile не найдена — пропускаю донастройку подписки"; return 0; }
+        db_exec() { sqlite3 "$dbfile" "$1" 2>/dev/null; }
+    fi
+
+    # Пробуем таблицу/ключ. Если схема изменилась в новой версии 3x-ui — тихо выходим.
+    local probe
+    probe=$(db_exec "SELECT count(*) FROM settings WHERE key='subEnable';" || true)
+    if ! [[ "$probe" =~ ^[0-9]+$ ]]; then
+        warn "Схема настроек 3x-ui не распознана (возможно, новая версия) — пропускаю донастройку подписки."
+        warn "Настрой вручную в панели: Subscription → включить JSON, задать URI-пути и шаблон примечания."
+        return 0
+    fi
+
+    # Обновляем только существующие ключи. Отсутствующий ключ = 0 строк, не ошибка.
+    db_exec "UPDATE settings SET value='true'                 WHERE key='subEnable';"     >/dev/null || true
+    db_exec "UPDATE settings SET value='true'                 WHERE key='subJsonEnable';" >/dev/null || true
+    db_exec "UPDATE settings SET value='$XUI_SUB_PATH'        WHERE key='subPath';"       >/dev/null || true
+    db_exec "UPDATE settings SET value='$XUI_SUB_JSON_PATH'   WHERE key='subJsonPath';"   >/dev/null || true
+    db_exec "UPDATE settings SET value='$XUI_REMARK_TEMPLATE' WHERE key='remarkTemplate';" >/dev/null || true
+
+    systemctl restart x-ui 2>/dev/null || true
+    log "Настройки подписки 3x-ui применены (JSON on, subPath=$XUI_SUB_PATH, subJsonPath=$XUI_SUB_JSON_PATH, remarkTemplate обновлён)"
+}
+
 # ═════════════════════════════════════════════════════════════════════════════
 # ШАГ 5: 3x-ui панель
 # ═════════════════════════════════════════════════════════════════════════════
@@ -338,6 +385,9 @@ if [ "$INSTALL_XUI" = "1" ]; then
     fi
     systemctl enable x-ui 2>/dev/null || true
     systemctl status x-ui --no-pager | head -5 || true
+
+    # Донастройка подписки (best-effort; не роняет установку при смене схемы БД).
+    apply_xui_sub_settings || true
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
