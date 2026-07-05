@@ -270,12 +270,18 @@ PIN
     fi
 
     mkdir -p /etc/ssl/private
+    # reloadcmd выполняется acme.sh при КАЖДОМ автопродлении сертификата:
+    #  • reload nginx — подхватить новый серт фронтом;
+    #  • try-restart x-ui — если панель 3x-ui использует этот же серт напрямую
+    #    (SSL-режим «Custom Certificate»), она читает файл только при старте,
+    #    поэтому без рестарта отдавала бы просроченный серт после продления.
+    #    try-restart трогает юнит только если он запущен; нет x-ui — no-op.
     /root/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
         --key-file       /etc/ssl/private/private.key \
         --fullchain-file /etc/ssl/private/cert.crt \
-        --reloadcmd      "systemctl reload nginx 2>/dev/null || true"
+        --reloadcmd      "systemctl reload nginx 2>/dev/null || true; systemctl try-restart x-ui 2>/dev/null || true"
     chmod 600 /etc/ssl/private/private.key
-    log "Сертификат установлен в /etc/ssl/private/"
+    log "Сертификат установлен в /etc/ssl/private/ (reloadcmd: nginx reload + x-ui restart)"
 
     step "Установка конфига nginx + сайта"
     # nginx из репозитория nginx.org не создаёт sites-available/sites-enabled
