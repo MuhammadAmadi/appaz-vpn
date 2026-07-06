@@ -472,6 +472,152 @@ if [ "$INSTALL_FAIL2BAN" = "1" ]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# ШАГ 8: Security & Routing Optimization (post-install, опционально)
+# Всё интерактивно и по умолчанию ВЫКЛЮЧЕНО — при отказе скрипт идёт дальше,
+# как и раньше. Ничего из базовой установки эти функции не меняют.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Изоляция панели 3x-ui за nginx (панель слушает только 127.0.0.1).
+# Поддержаны обе БД панели (PostgreSQL/SQLite) — тип определяется автоматически.
+isolate_panel_behind_nginx() {
+    local NGINX_SITE=/etc/nginx/sites-available/appaz
+    [ -f "$NGINX_SITE" ] || { warn "Конфиг nginx $NGINX_SITE не найден — пропускаю"; return 1; }
+
+    # Определяем, как обращаться к БД панели.
+    local dbtype
+    dbtype=$(xui_result_get XUI_DB_TYPE 2>/dev/null)
+    [ -z "$dbtype" ] && dbtype=$(grep -oP 'XUI_DB_TYPE=\K\S+' /etc/default/x-ui 2>/dev/null || echo sqlite)
+    if [ "$dbtype" = "postgres" ]; then
+        command -v psql >/dev/null 2>&1 || { warn "psql не найден — пропускаю изоляцию"; return 1; }
+        db_exec() { sudo -u postgres psql -d xui -tAc "$1" 2>/dev/null; }
+    else
+        [ -f /etc/x-ui/x-ui.db ] || { warn "БД /etc/x-ui/x-ui.db не найдена — пропускаю изоляцию"; return 1; }
+        command -v sqlite3 >/dev/null 2>&1 || apt-get install -y -qq sqlite3 >/dev/null 2>&1 || { warn "sqlite3 недоступен — пропускаю изоляцию"; return 1; }
+        db_exec() { sqlite3 /etc/x-ui/x-ui.db "$1" 2>/dev/null; }
+    fi
+
+    # Динамически читаем секретный путь и порт панели.
+    local PANEL_PATH PANEL_PORT
+    PANEL_PATH=$(db_exec "SELECT value FROM settings WHERE key='webBasePath';")
+    PANEL_PORT=$(db_exec "SELECT value FROM settings WHERE key='webPort';")
+    [ -z "$PANEL_PORT" ] && PANEL_PORT=2083
+    if [ -z "$PANEL_PATH" ] || [[ "$PANEL_PATH" != /* ]]; then
+        warn "Не удалось прочитать webBasePath из БД панели — пропускаю изоляцию (настрой вручную)"
+        return 1
+    fi
+    [[ "$PANEL_PATH" != */ ]] && PANEL_PATH="${PANEL_PATH}/"
+
+    # 1) Панель слушает только localhost + рестарт.
+    db_exec "UPDATE settings SET value='127.0.0.1' WHERE key='webListen';" >/dev/null || true
+    db_exec "UPDATE settings SET value='127.0.0.1' WHERE key='subListen';" >/dev/null || true
+    systemctl restart x-ui 2>/dev/null || true
+    log "Панель 3x-ui изолирована на 127.0.0.1 (webListen/subListen обновлены)"
+
+    # 2) Инъекция location панели в nginx (с бэкапом и откатом при провале).
+    cp -a "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%s)"
+    if ! grep -q "location \^~ ${PANEL_PATH}" "$NGINX_SITE"; then
+        local tmpblock; tmpblock=$(mktemp)
+        cat > "$tmpblock" <<NGINXBLOCK
+    # 3x-ui панель за реверс-прокси (изолирована на 127.0.0.1:${PANEL_PORT})
+    location ^~ ${PANEL_PATH} {
+        proxy_pass https://127.0.0.1:${PANEL_PORT}${PANEL_PATH};
+        proxy_ssl_verify off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+NGINXBLOCK
+        awk -v f="$tmpblock" '/location \/ \{/ && !ins {while((getline l < f)>0) print l; ins=1} {print}' \
+            "$NGINX_SITE" > "${NGINX_SITE}.new" && mv "${NGINX_SITE}.new" "$NGINX_SITE"
+        rm -f "$tmpblock"
+        log "location ^~ ${PANEL_PATH} добавлен в nginx-конфиг"
+    else
+        warn "location для панели уже есть — пропускаю инъекцию"
+    fi
+
+    # 3) grpc_buffer_size 0; в блок /chri-grpc.
+    if ! grep -q "grpc_buffer_size" "$NGINX_SITE"; then
+        sed -i '/grpc_pass grpc:\/\/127.0.0.1:2053;/a\        grpc_buffer_size 0;' "$NGINX_SITE"
+        log "grpc_buffer_size 0; добавлен в location /chri-grpc"
+    fi
+
+    # 4) Проверка и reload; при провале — откат из бэкапа.
+    if nginx -t 2>/dev/null; then
+        systemctl reload nginx
+        log "nginx перезагружен. Панель теперь: https://${DOMAIN}${PANEL_PATH}"
+    else
+        warn "nginx -t не прошёл — откатываю конфиг из бэкапа"
+        local lastbak; lastbak=$(ls -t ${NGINX_SITE}.bak.* 2>/dev/null | head -1)
+        [ -n "$lastbak" ] && cp -a "$lastbak" "$NGINX_SITE"
+        nginx -t 2>/dev/null && systemctl reload nginx 2>/dev/null || true
+        return 1
+    fi
+    return 0
+}
+
+# NAT + UFW для Hysteria2 Port Hopping (udp 20000-30000 → 443).
+setup_port_hopping() {
+    local BR=/etc/ufw/before.rules
+    [ -f "$BR" ] || { warn "$BR не найден — пропускаю port hopping"; return 1; }
+
+    ufw allow 20000:30000/udp comment 'Hysteria2 port hopping' >/dev/null 2>&1 || true
+    log "ufw: открыт диапазон 20000:30000/udp"
+
+    if grep -q "dport 20000:30000" "$BR"; then
+        warn "NAT-правило port hopping уже есть в $BR — пропускаю вставку"
+    else
+        cp -a "$BR" "${BR}.bak.$(date +%s)"
+        awk '/^\*filter/ && !ins {
+                print "*nat";
+                print ":PREROUTING ACCEPT [0:0]";
+                print "-A PREROUTING -p udp --dport 20000:30000 -j REDIRECT --to-ports 443";
+                print "COMMIT";
+                print "";
+                ins=1
+             } {print}' "$BR" > "${BR}.new" && mv "${BR}.new" "$BR"
+        log "NAT-блок вставлен в $BR (udp 20000:30000 → 443)"
+    fi
+
+    if ufw reload >/dev/null 2>&1; then
+        log "Port hopping активен: udp 20000-30000 → Hysteria2 (443)"
+    else
+        warn "ufw reload не прошёл — проверь /etc/ufw/before.rules вручную"
+        return 1
+    fi
+    return 0
+}
+
+# ── Интерактивные вопросы (пропускаются в --auto и без терминала) ────────────
+if [ "$AUTO" != "1" ]; then
+    step "Security & Routing Optimization (опционально)"
+
+    # 8.1 Изоляция панели — только если ставились и nginx, и 3x-ui.
+    if [ "$INSTALL_XUI" = "1" ] && [ "$INSTALL_NGINX" = "1" ] && [ -d /usr/local/x-ui ]; then
+        read -p "Спрятать панель 3x-ui за nginx (изолировать на 127.0.0.1)? [y/N] " ANS_ISO || ANS_ISO=""
+        if [[ "${ANS_ISO:-N}" =~ ^[Yy] ]]; then
+            isolate_panel_behind_nginx || warn "Изоляция панели не завершилась — проверь вручную"
+        else
+            log "Изоляция панели пропущена (панель осталась как есть)"
+        fi
+    fi
+
+    # 8.2 NAT + Port Hopping — только если ставился ufw.
+    if [ "$INSTALL_UFW" = "1" ]; then
+        read -p "Настроить UFW + Port Hopping (20000-30000/udp → Hysteria2 443)? [y/N] " ANS_HOP || ANS_HOP=""
+        if [[ "${ANS_HOP:-N}" =~ ^[Yy] ]]; then
+            setup_port_hopping || warn "Настройка port hopping не завершилась — проверь вручную"
+        else
+            log "Port hopping пропущен"
+        fi
+    fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Финальный summary
 # ═════════════════════════════════════════════════════════════════════════════
 step "Установка завершена"
